@@ -8,7 +8,7 @@
 
 .DESCRIPTION
 
-    Reads configuration from RSAT-Configuration.json and ensures that
+    Uses an embedded configuration definition to ensure that
 
     configured Windows RSAT capabilities and Windows Optional Features
 
@@ -915,14 +915,6 @@ else
 
 
 
-$ConfigPath = Join-Path `
-
--Path $(Get-ScriptPathandName -PathOnly) `
-
--ChildPath "ToolSelection.json"
-
-
-
 $RestartRequired = $false
 
 $ErrorsDetected = $false
@@ -935,62 +927,214 @@ $ChangesMade = $false
 
 # ============================================================================
 
-# Load configuration
+# Load configuration (Embedded JSON)
 
 # ============================================================================
 
 
 
-if (-not (Test-Path $ConfigPath))
+$JsonConfig = @"
 {
-
-    WriteLogEntry `
-
-    -LogText "ERROR: Configuration file not found: $ConfigPath" `
-
-    -TextColour Red
-
-
-
-    exit 1
-
+    "Toolsets": {
+        "ActiveDirectory": {
+            "RSAT": [
+                "Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "GPMC": {
+            "RSAT": [
+                "Rsat.GroupPolicy.Management.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "DHCP": {
+            "RSAT": [
+                "Rsat.DHCP.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "DFS": {
+            "RSAT": [
+                "Rsat.FileServices.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "DNS": {
+            "RSAT": [
+                "Rsat.Dns.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "AzureStackHCI": {
+            "RSAT": [
+                "Rsat.AzureStack.HCI.Management.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "BitLocker": {
+            "RSAT": [
+                "Rsat.BitLocker.Recovery.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "CertificateServices": {
+            "RSAT": [
+                "Rsat.CertificateServices.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "FailoverClustering": {
+            "RSAT": [
+                "Rsat.FailoverCluster.Management.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "IPAM": {
+            "RSAT": [
+                "Rsat.IPAM.Client.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "DataCenterBridging": {
+            "RSAT": [
+                "Rsat.LLDP.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "NetworkController": {
+            "RSAT": [
+                "Rsat.NetworkController.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "NetworkLoadBalancing": {
+            "RSAT": [
+                "Rsat.NetworkLoadBalancing.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "RemoteAccess": {
+            "RSAT": [
+                "Rsat.RemoteAccess.Management.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "RemoteDesktopServices": {
+            "RSAT": [
+                "Rsat.RemoteDesktop.Services.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "ServerManager": {
+            "RSAT": [
+                "Rsat.ServerManager.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "StorageMigrationService": {
+            "RSAT": [
+                "Rsat.StorageMigrationService.Management.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "StorageReplica": {
+            "RSAT": [
+                "Rsat.StorageReplica.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "SystemInsights": {
+            "RSAT": [
+                "Rsat.SystemInsights.Management.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "VolumeActivation": {
+            "RSAT": [
+                "Rsat.VolumeActivation.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "WSUS": {
+            "RSAT": [
+                "Rsat.WSUS.Tools~~~~0.0.1.0"
+            ],
+            "WindowsFeatures": []
+        },
+        "HypervManagement": {
+            "RSAT": [],
+            "WindowsFeatures": [
+                "Microsoft-Hyper-V-Management-Clients",
+                "Microsoft-Hyper-V-Management-PowerShell"
+            ]
+        }
+    },
+    "CompositeToolsets": {
+        "AllTools": [
+            "ActiveDirectory",
+            "GPMC",
+            "DHCP",
+            "DFS",
+            "DNS",
+            "AzureStackHCI",
+            "BitLocker",
+            "CertificateServices",
+            "FailoverClustering",
+            "IPAM",
+            "DataCenterBridging",
+            "NetworkController",
+            "NetworkLoadBalancing",
+            "RemoteAccess",
+            "RemoteDesktopServices",
+            "ServerManager",
+            "StorageMigrationService",
+            "StorageReplica",
+            "SystemInsights",
+            "VolumeActivation",
+            "WSUS",
+            "HypervManagement"
+        ]
+    },
+    "Roles": {
+        "All": [
+            "AllTools"
+        ],
+        "XXXX": [
+            "ActiveDirectory",
+            "GPMC",
+            "DHCP",
+            "DFS",
+            "DNS"
+        ]
+    },
+    "Settings": {
+        "AllowRestart": false,
+        "VerifyAfterChanges": true,
+        "IgnoreUnavailableComponents": true,
+        "FailOnInstallationError": true
+    }
 }
-
-
-
-
+"@
 
 try
 {
 
-    $Config = Get-Content `
-
-    -Path $ConfigPath `
-
-    -Raw `
-
-    -ErrorAction Stop |
-
-    ConvertFrom-Json `
-
-    -ErrorAction Stop
-
-
+    $Config = $JsonConfig | ConvertFrom-Json -ErrorAction Stop
 
     WriteLogEntry `
 
-    -LogText "Configuration loaded successfully: $ConfigPath" `
+    -LogText "Embedded JSON configuration loaded successfully." `
 
     -TextColour Green
 
 }
-
 catch
 {
 
     StandardErrorHandler `
 
-    -AdditionalErrorText "Unable to read configuration file [$ConfigPath]"
+    -AdditionalErrorText "Unable to read embedded JSON configuration."
 
 
 
@@ -1644,7 +1788,8 @@ else
 
 # ============================================================================
 
-
+if (-not $Global:DetectOnly)
+{
 
 WriteLogEntry -LogText "------------------------------------------------------------"
 
@@ -2196,6 +2341,8 @@ foreach ($FeatureName in $SelectedWindowsFeatures)
 
 
 
+}
+
 # ============================================================================
 
 # Final status of selected RSAT capabilities
@@ -2404,6 +2551,78 @@ WriteLogEntry `
 
 
 
+
+
+# ============================================================================
+
+# Registry Tagging and Intune Detection
+
+# ============================================================================
+
+
+
+if (-not $Global:DetectOnly -and -not $ErrorsDetected)
+{
+    $RegPath = "HKLM:\SOFTWARE\CustomSOE\AdminTools"
+    if (-not (Test-Path $RegPath)) {
+        New-Item -Path $RegPath -Force | Out-Null
+    }
+    if (-not [string]::IsNullOrWhiteSpace($RoleSelection)) {
+        Set-ItemProperty -Path $RegPath -Name "RoleSelection" -Value $RoleSelection -Force
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ToolsetSelection)) {
+        Set-ItemProperty -Path $RegPath -Name "ToolsetSelection" -Value $ToolsetSelection -Force
+    }
+    Set-ItemProperty -Path $RegPath -Name "LastInstallDate" -Value (Get-Date -Format "s") -Force
+
+    WriteLogEntry -LogText "Registry tagging completed successfully at $RegPath" -TextColour Green
+}
+
+if ($Global:DetectOnly)
+{
+    WriteLogEntry -LogText "Performing Intune custom detection check..."
+    $RegPath = "HKLM:\SOFTWARE\CustomSOE\AdminTools"
+    $IsDetected = $false
+    
+    if (Test-Path $RegPath) {
+        $RegRole = Get-ItemPropertyValue -Path $RegPath -Name "RoleSelection" -ErrorAction SilentlyContinue
+        $RegToolset = Get-ItemPropertyValue -Path $RegPath -Name "ToolsetSelection" -ErrorAction SilentlyContinue
+        
+        # Verify components are actually installed
+        $MissingComponents = $false
+        
+        foreach ($CapabilityName in $SelectedRSAT) {
+            $Check = Get-WindowsCapability -Online -Name $CapabilityName -ErrorAction SilentlyContinue
+            if ($Check.State -ne "Installed") {
+                $MissingComponents = $true
+                WriteLogEntry -LogText "Detection failed: Missing RSAT $CapabilityName" -TextColour Yellow
+                break
+            }
+        }
+        
+        if (-not $MissingComponents) {
+            foreach ($FeatureName in $SelectedWindowsFeatures) {
+                $Check = Get-WindowsOptionalFeature -Online -FeatureName $FeatureName -ErrorAction SilentlyContinue
+                if ($Check.State -ne "Enabled") {
+                    $MissingComponents = $true
+                    WriteLogEntry -LogText "Detection failed: Missing Windows Feature $FeatureName" -TextColour Yellow
+                    break
+                }
+            }
+        }
+        
+        if (-not $MissingComponents) {
+            $IsDetected = $true
+        }
+    }
+    
+    if ($IsDetected) {
+        Write-Host "Detected"
+        exit 0
+    } else {
+        exit 1
+    }
+}
 
 
 # ============================================================================
