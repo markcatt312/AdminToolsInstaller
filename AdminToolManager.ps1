@@ -585,82 +585,29 @@ function Get-ScriptPathandName
 function Test-PendingReboot
 {
     # 20260924 - needs testing
-
     $Reasons = @()
 
-
-
-    if (
-
-        Test-Path `
-
-        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"
-
-    )
-
+    if (Test-Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending")
     {
-
         $Reasons += "Component Based Servicing"
-
     }
 
-
-
-
-
-    if (
-
-        Test-Path `
-
-        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
-
-    )
-
+    if (Test-Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired")
     {
-
         $Reasons += "Windows Update"
-
     }
 
-
-
-
-
-    $PendingFileRenameOperations = (
-
-        Get-ItemProperty `
-
-        "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" `
-
-        -Name PendingFileRenameOperations `
-
-        -ErrorAction SilentlyContinue
-
-    ).PendingFileRenameOperations
-
-
-
-
+    $PendingFileRenameOperations = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" -Name PendingFileRenameOperations -ErrorAction SilentlyContinue).PendingFileRenameOperations
 
     if ($null -ne $PendingFileRenameOperations)
     {
-
         $Reasons += "Pending File Rename Operations"
-
     }
-
-
-
-
 
     [PSCustomObject]@{
-
         RebootPending = ($Reasons.Count -gt 0)
-
         Reasons       = @($Reasons)
-
     }
-
 }
 
 
