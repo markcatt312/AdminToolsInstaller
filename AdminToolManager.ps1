@@ -369,7 +369,7 @@ function WriteLogEntry
                 if ($Content.Count -gt $MaxLogLines)
                 {
 
-                    $KeepLines = $KeepLines = [Math]::Max([Math]::Floor($MaxLogLines * 0.9), 1)
+                    $KeepLines = [Math]::Max([Math]::Floor($MaxLogLines * 0.9), 1)
 
 
 
@@ -841,6 +841,23 @@ else
 
 
 ### MAIN CODE GOES HERE...
+
+if ($Global:DetectOnly) {
+    # If parameters were not passed, attempt to read them from the registry tag
+    if ([string]::IsNullOrWhiteSpace($ToolsetSelection) -and [string]::IsNullOrWhiteSpace($RoleSelection)) {
+        $RegPath = "HKLM:\SOFTWARE\CustomSOE\AdminTools"
+        if (Test-Path $RegPath) {
+            $RoleSelection = Get-ItemPropertyValue -Path $RegPath -Name "RoleSelection" -ErrorAction SilentlyContinue
+            $ToolsetSelection = Get-ItemPropertyValue -Path $RegPath -Name "ToolsetSelection" -ErrorAction SilentlyContinue
+        }
+    }
+    
+    # If still empty, it means the registry tag is missing, so it's not installed.
+    if ([string]::IsNullOrWhiteSpace($ToolsetSelection) -and [string]::IsNullOrWhiteSpace($RoleSelection)) {
+        WriteLogEntry -LogText "No registry tag found and no parameters provided. Treating as Not Detected."
+        exit 1
+    }
+}
 
 
 
@@ -2563,19 +2580,24 @@ WriteLogEntry `
 
 if (-not $Global:DetectOnly -and -not $ErrorsDetected)
 {
-    $RegPath = "HKLM:\SOFTWARE\CustomSOE\AdminTools"
-    if (-not (Test-Path $RegPath)) {
-        New-Item -Path $RegPath -Force | Out-Null
+    try {
+        $RegPath = "HKLM:\SOFTWARE\CustomSOE\AdminTools"
+        if (-not (Test-Path $RegPath)) {
+            New-Item -Path $RegPath -Force -ErrorAction Stop | Out-Null
+        }
+        if (-not [string]::IsNullOrWhiteSpace($RoleSelection)) {
+            Set-ItemProperty -Path $RegPath -Name "RoleSelection" -Value $RoleSelection -Force -ErrorAction Stop
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ToolsetSelection)) {
+            Set-ItemProperty -Path $RegPath -Name "ToolsetSelection" -Value $ToolsetSelection -Force -ErrorAction Stop
+        }
+        Set-ItemProperty -Path $RegPath -Name "LastInstallDate" -Value (Get-Date -Format "s") -Force -ErrorAction Stop
+    
+        WriteLogEntry -LogText "Registry tagging completed successfully at $RegPath" -TextColour Green
     }
-    if (-not [string]::IsNullOrWhiteSpace($RoleSelection)) {
-        Set-ItemProperty -Path $RegPath -Name "RoleSelection" -Value $RoleSelection -Force
+    catch {
+        StandardErrorHandler -AdditionalErrorText "Failed to write registry tags at $RegPath"
     }
-    if (-not [string]::IsNullOrWhiteSpace($ToolsetSelection)) {
-        Set-ItemProperty -Path $RegPath -Name "ToolsetSelection" -Value $ToolsetSelection -Force
-    }
-    Set-ItemProperty -Path $RegPath -Name "LastInstallDate" -Value (Get-Date -Format "s") -Force
-
-    WriteLogEntry -LogText "Registry tagging completed successfully at $RegPath" -TextColour Green
 }
 
 if ($Global:DetectOnly)
