@@ -4,20 +4,14 @@
 .DESCRIPTION
     Uses an embedded configuration definition to ensure that
     configured Windows RSAT capabilities and Windows Optional Features
-    are Installed, Removed, or Ignored.
-    Supports:
-        Install
-        Remove
-        Ignore
+    are Installed.
     RSAT components are handled through:
         Get-WindowsCapability
         Add-WindowsCapability
-        Remove-WindowsCapability
     Windows Optional Features such as Hyper-V Management Tools are handled
     separately through:
         Get-WindowsOptionalFeature
         Enable-WindowsOptionalFeature
-        Disable-WindowsOptionalFeature
     Hyper-V management components can therefore be installed without
     enabling the Hyper-V platform itself.
 .NOTES
@@ -61,7 +55,9 @@ param (
         "All",
         "SOE"
     )]
-    [string]$RoleSelection
+    [string]$RoleSelection,
+    [Parameter(Mandatory = $false)]
+    [switch]$DetectOnly
 )
 Set-StrictMode -Version 1
 $LogfilePath = "c:\Windows\SOELogs"
@@ -131,7 +127,7 @@ function WriteLogEntry {
             # Second-chance logging
             if ($Global:GlobalMsgNotLogged -ne "") {
                 "$($Global:GlobalMsgNotLogged) (warning: previous log write failed)" |
-                    Out-File $File -Append -Encoding UTF8
+                Out-File $File -Append -Encoding UTF8
                 $Global:GlobalMsgNotLogged = ""
             }
             # Write current entry
@@ -142,8 +138,8 @@ function WriteLogEntry {
                 if ($Content.Count -gt $MaxLogLines) {
                     $KeepLines = [Math]::Max([Math]::Floor($MaxLogLines * 0.9), 1)
                     $Content |
-                        Select-Object -Last $KeepLines |
-                        Set-Content $File -Encoding UTF8
+                    Select-Object -Last $KeepLines |
+                    Set-Content $File -Encoding UTF8
                 }
             }
         }
@@ -289,10 +285,18 @@ function Resolve-Toolset {
 # ============== RUN CODE =====================
 # Auto-detects if run as Intune custom detection script ...
 $TestPath_IntuneDetection = "C:\Program Files (x86)\Microsoft Intune Management Extension\Content\DetectionScripts*"
-if ($PSScriptRoot -like "$TestPath_IntuneDetection")
-{ $Global:DetectOnly = $true; WriteLogEntry -LogText "Assuming run as Intune Custom Detection Script due to run path [$PSScriptRoot]. Set [`$Global:DetectOnly = `$true]" }
-else
-{ $Global:DetectOnly = $false; WriteLogEntry -LogText "Assuming not run as Intune Custom Detection Script." }
+if ($DetectOnly) {
+    $Global:DetectOnly = $true
+    WriteLogEntry -LogText "DetectOnly switch parameter provided. Running in detection mode."
+}
+elseif ($PSScriptRoot -like "$TestPath_IntuneDetection") {
+    $Global:DetectOnly = $true
+    WriteLogEntry -LogText "Assuming run as Intune Custom Detection Script due to run path [$PSScriptRoot]. Set [`$Global:DetectOnly = `$true]"
+}
+else {
+    $Global:DetectOnly = $false
+    WriteLogEntry -LogText "Assuming not run as Intune Custom Detection Script."
+}
 $thisHost = hostname
 $LoggedOnUser = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
 WriteLogEntry -LogText "######################"
@@ -527,7 +531,7 @@ $JsonConfig = @"
         "VerifyAfterChanges": true,
         "IgnoreUnavailableComponents": true,
         "FailOnInstallationError": true,
-        "OfflineCapabilitySource": "\\\\dacsrv15\\pkgsource$\\Wkstn_MOE\\OSD\\Operating Systems\\Windows 11 Enterprise - 24H2\\LOF\\LanguagesAndOptionalFeatures"
+        "OfflineCapabilitySource": "\\\\FileServername\\ShareName\\Win11_24H2_English_LOF"
     }
 }
 "@
@@ -650,7 +654,7 @@ if (-not [string]::IsNullOrWhiteSpace($ToolsetSelection)) {
 # Remove duplicate atomic Toolsets
 $SelectedToolsets = @(
     $SelectedToolsets |
-        Select-Object -Unique
+    Select-Object -Unique
 )
 if ($SelectedToolsets.Count -eq 0) {
     WriteLogEntry -LogText "ERROR: Selection resolved to zero Toolsets."  -TextColour Red
@@ -681,17 +685,17 @@ foreach ($Toolset in $SelectedToolsets) {
 # Remove duplicates
 $SelectedRSAT = @(
     $SelectedRSAT |
-        Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_)
-        } |
-        Select-Object -Unique
+    Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } |
+    Select-Object -Unique
 )
 $SelectedWindowsFeatures = @(
     $SelectedWindowsFeatures |
-        Where-Object {
-            -not [string]::IsNullOrWhiteSpace($_)
-        } |
-        Select-Object -Unique
+    Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } |
+    Select-Object -Unique
 )
 WriteLogEntry -LogText "------------------------------------------------------------"
 WriteLogEntry -LogText "Resolved RSAT capabilities: $($SelectedRSAT.Count)"
@@ -748,9 +752,9 @@ if (-not $Global:DetectOnly) {
         WriteLogEntry -LogText "Processing: $CapabilityName"
         $Capability = @(
             $AvailableRSAT |
-                Where-Object {
-                    $_.Name -eq $CapabilityName
-                }
+            Where-Object {
+                $_.Name -eq $CapabilityName
+            }
         )
         if ($Capability.Count -eq 0) {
             $Message =
@@ -768,7 +772,7 @@ if (-not $Global:DetectOnly) {
         }
         # Ensure only a single matching capability is processed
         $Capability = $Capability |
-            Select-Object -First 1
+        Select-Object -First 1
         WriteLogEntry -LogText "Current state: $($Capability.State)"
         if ($Capability.State -eq "Installed") {
             WriteLogEntry     -LogText "$CapabilityName is already installed."        -TextColour Green
@@ -1002,6 +1006,11 @@ if ($Global:DetectOnly) {
 # ============================================================================
 # Handle restart
 # ============================================================================
+if ($ErrorsDetected) {
+    WriteLogEntry -LogText "Script completed with errors." -TextColour Red
+    exit 1
+}
+
 if ($RestartRequired) {
     WriteLogEntry -LogText "WARNING: One or more components require a restart."  -TextColour Yellow
     if ($AllowRestart) {
@@ -1015,6 +1024,8 @@ if ($RestartRequired) {
         exit 3010
     }
 }
+
 WriteLogEntry -LogText "Completed script successfully." -TextColour Green
 exit 0
+
 
